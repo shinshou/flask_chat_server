@@ -45,12 +45,12 @@ CORS(
 )
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-# app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
-#     basedir, "data.sqlite"
-# )
-app.config[
-    "SQLALCHEMY_DATABASE_URI"
-] = "mysql+pymysql://dbuser:Ssenj_20230815@localhost/flaskserver"
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
+    basedir, "data.sqlite"
+)
+# app.config[
+#     "SQLALCHEMY_DATABASE_URI"
+# ] = "mysql+pymysql://dbuser:Ssenj_20230815@localhost/flaskserver"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 Migrate(app, db)
@@ -80,7 +80,9 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 # from flask_chat_server.users.views import users
 from flask_chat_server.error_pages.handlers import error_pages
 from flask_chat_server.main.views import main
+from flask_chat_server.users.views import users
 
 # app.register_blueprint(users)
 app.register_blueprint(error_pages)
 app.register_blueprint(main)
+app.register_blueprint(users)
