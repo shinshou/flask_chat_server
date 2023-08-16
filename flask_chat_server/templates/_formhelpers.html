@@ -1,0 +1,12 @@
+{%macro render_field(field)%}
+<!-- **kwargsは任意の数の引数を渡すことができる。 -->
+<!-- | 以降はフィルター safeはエスケープ処理を省略する。-->
+<!-- wtformsはもともとエスケープ処理がされているため追加でエスケープしない。 -->
+{{field(**kwargs)|safe}}
+{%if field.errors%}
+<br>
+{%for error in field.errors%}
+{{error}}
+{%endfor%}
+{%endif%}
+{%endmacro%}
