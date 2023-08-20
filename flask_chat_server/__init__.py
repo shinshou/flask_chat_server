@@ -6,11 +6,14 @@ from flask_login import LoginManager
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv(), override=True)
 
 app = Flask(__name__)
 
 # csrf対策
-app.config["SECRET_KEY"] = "mysecretkey"
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
 
 # IPアドレスごとのリクエスト制限
 limiter = Limiter(
@@ -45,12 +48,13 @@ CORS(
 )
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-# app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
-#     basedir, "data.sqlite"
-# )
-app.config[
-    "SQLALCHEMY_DATABASE_URI"
-] = "mysql+pymysql://dbuser:Ssenj_20230815@localhost/flaskserver"
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
+    basedir, "data.sqlite"
+)
+# app.config[
+#     "SQLALCHEMY_DATABASE_URI"
+# ] = os.environ.get("MYSQL_CONFIG")
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 Migrate(app, db)
@@ -70,11 +74,11 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import event
 
 
-# @event.listens_for(Engine, "connect")
-# def set_sqlite_pragma(dbapi_connection, connection_record):
-#     cursor = dbapi_connection.cursor()
-#     cursor.execute("PRAGMA foreign_keys=ON")
-#     cursor.close()
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 # from flask_chat_server.users.views import users

@@ -487,7 +487,10 @@ def ask_gpt(message):
     from langchain.chains import RetrievalQA
     from langchain.chat_models import ChatOpenAI
     import openai
+    import os
     from openai.error import RateLimitError, ServiceUnavailableError
+
+    openai.api_key = os.environ.get("OPENAI_API_KEY")
 
     llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.5)
 
@@ -556,7 +559,10 @@ def ask_gpt(message):
 def judge_user_question(message):
     import json
     import openai
+    import os
     from openai.error import RateLimitError, ServiceUnavailableError
+
+    openai.api_key = os.environ.get("OPENAI_API_KEY")
 
     system_prompt = """
         あなたは福祉についてのHPを運営しています。
