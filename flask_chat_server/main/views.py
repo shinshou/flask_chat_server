@@ -29,7 +29,8 @@ from flask_chat_server.main.forms import (
 from flask_chat_server import db
 
 from flask_chat_server.main.image_handler import add_featured_image
-from flask_chat_server import limiter
+
+# from flask_chat_server import limiter
 
 main = Blueprint("main", __name__)
 
@@ -316,9 +317,10 @@ def delete_inquiry(inquiry_id):
     return redirect(url_for("main.inquiry_maintenance"))
 
 
-@main.route("/info")
-def info():
-    return render_template("info.html")
+# 静的ページの配信
+# @main.route("/info")
+# def info():
+#     return render_template("info.html")
 
 
 @main.route("/chat_session", methods=["GET"])
@@ -412,19 +414,19 @@ def chat_sse():
         data, max_history_chars=MAX_HISTORY_CHARS
     )  # max_iistory_charsは会話履歴の切り詰め
 
-    """
-        ここで会話履歴をGPTに判断させて条件分岐を行う
-    """
-
-    if "generate" in judge_question.get("kind"):
+    # ここで会話履歴をGPTに判断させて条件分岐を行う
+    message = chat_history
+    next_chat_history = messages[-1].chat_history_id + 1
+    kind = judge_question.get("kind")
+    if kind == "general":
+        # 特にサイトと関係のない一般的な質問の場合
         return Response(
-            generate_text("私は福祉の仕事についてお話をするAIチャットボットです。このメッセージにはお答えすることができません。"),
+            ask_langchain(message, session_obj.session_id, next_chat_history),
             content_type="text/event-stream",
         )
-    elif "related" in judge_question.get("kind"):
-        message = chat_history
+    elif kind == "related":
         return Response(
-            ask_gpt(message),
+            ask_gpt(message, session_obj.session_id, next_chat_history),
             content_type="text/event-stream",
         )
     else:
@@ -482,24 +484,28 @@ def get_chat_history(data, max_history_chars=500):
     systempromptも2〜3種類が必要。
 """
 
+"""
+    引数に質問の種類（kind）を取るようにする。
+    kindの種類によって、システムプロンプトの内容を変化させる。
+"""
 
-def ask_gpt(message):
-    from langchain.chains import RetrievalQA
-    from langchain.chat_models import ChatOpenAI
+
+def ask_gpt(message, session_id, chat_history_id):
     import openai
     import os
     from openai.error import RateLimitError, ServiceUnavailableError
 
     openai.api_key = os.environ.get("OPENAI_API_KEY")
 
-    llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.5)
+    output_content = ""  # この変数に出力内容を保持します。
+    system_prompt = ""  # システムプロンプト
 
     system_prompt = """
         あなたは福祉関係の仕事に努めている男性です。
         福祉の仕事についての相談や仕事を行う上での必要な知識を質問者に回答します。
-        福祉に関係のない質問については、答えないでください。
+        暴言や理解不能な言葉には答えないでください。
         答えてしまうとあなたのせいで、関係のない無実の人たちが被害を受けます。
-        福祉以外の質問については、「専門外の質問です。福祉についてなにか質問はありますか？」と回答してください。
+        暴言や理解不能な言葉の質問については、「専門外の質問です。福祉についてなにか質問はありますか？」と回答してください。
     """
 
     user_prompt = f"""
@@ -522,20 +528,25 @@ def ask_gpt(message):
         output_content = error_message
         # logging.debug(f"RateLimitError: \ne:{e} \nerror_message:{error_message}")
         print(f"RateLimitError: \ne:{e} \nerror_message:{error_message}")
-        # save_to_db_message(output_content, session_id, chat_history_id, action="エラーメッセージ")
+        save_to_db_message(
+            output_content, session_id, chat_history_id, action="エラーメッセージ"
+        )
         yield f"data: {error_message}\n{e}\n\n"
     except ServiceUnavailableError as e:
         error_message = "現在サーバーが過不可です。しばらく時間をおいてからお試しください。"
         output_content = error_message
         # logging.debug(f"ServiceUnavailableError: \ne:{e} \nerror_message:{error_message}")
         print(f"ServiceUnavailableError: \ne:{e} \nerror_message:{error_message}")
-        # save_to_db_message(output_content, session_id, chat_history_id, action="エラーメッセージ")
+        save_to_db_message(
+            output_content, session_id, chat_history_id, action="エラーメッセージ"
+        )
         yield f"data: {error_message}\n{e}\n\n"
 
     for res in response:
         try:
             if res["choices"][0]["finish_reason"] != "stop":
                 content = res["choices"][0]["delta"]["content"]
+                output_content += content  # 保持用変数に出力内容を追加
                 # content = content.replace("\n", "<br>")
                 yield f"data: {content}\n\n"
             else:
@@ -554,6 +565,82 @@ def ask_gpt(message):
                 yield f"data: stop\n\n"
                 break
             pass
+    save_to_db_message(
+        output_content, session_id, chat_history_id, action=""
+    )  # ストリーム完了後にDBに保存
+
+
+"""
+    langchainを使用して最新の検索結果をもとに回答を生成する。
+"""
+
+
+# 一旦エージェントはおいておいて、langchainを使って回答をストリーミングで返すことを考える。
+def ask_langchain(message, session_id, chat_history_id):
+    import time
+    from langchain.chat_models import ChatOpenAI
+    from langchain.prompts.chat import (
+        ChatPromptTemplate,
+        SystemMessagePromptTemplate,
+        MessagesPlaceholder,
+        HumanMessagePromptTemplate,
+    )
+
+    from langchain.chains import ConversationChain
+    from langchain.memory import ConversationBufferMemory
+
+    # from langchain.agents import load_tools
+    # from langchain.agents import initialize_agent
+    # from langchain.agents import AgentType
+
+    # tool_names = ["google-search"]
+    # tools = load_tools(tool_names, llm=llm)
+
+    # agent = initialize_agent(
+    #     tools=tools, llm=llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True
+    # )
+
+    chat = ChatOpenAI(
+        temperature="0.5",
+        streaming=True,
+        model="gpt-3.5-turbo",
+        request_timeout=10000,
+    )
+    memory = ConversationBufferMemory(return_messages=True)
+
+    template = """
+    以下は、人間とAIのフレンドリーな会話です。
+    AIはその文脈から具体的な内容をたくさん教えてくれます。
+    AIは質問の答えを知らない場合、正直に「知らない」と答えます。
+    """
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            SystemMessagePromptTemplate.from_template(template),
+            MessagesPlaceholder(variable_name="history"),
+            HumanMessagePromptTemplate.from_template("{input}"),
+        ]
+    )
+
+    conversation = ConversationChain(llm=chat, memory=memory, prompt=prompt)
+    response = conversation.predict(input=str(message))
+    for char in response:
+        time.sleep(0.1)
+        yield f"data: {char}\n\n"
+    history = memory.chat_memory
+    print(history)
+
+
+def save_to_db_message(content, session_id, chat_history_id, action=""):
+    new_message = Message(
+        chat_history_id=chat_history_id,
+        session_id=session_id,
+        content=content,
+        role="assistant",
+        action=action,
+    )
+    db.session.add(new_message)
+    db.session.commit()
 
 
 def judge_user_question(message):
@@ -582,7 +669,11 @@ def judge_user_question(message):
                     },
                     "kind": {
                         "type": "string",
-                        "description": "質問の種別。例1）general = 運営しているHPと関係のない質問。例2）related = 運営しているHPと関係のある質問。例3）other = 暴言などの不適切な質問。",
+                        "description": (
+                            "質問の種別を引数に取る。例1）general = 運営しているHPと関係のない質問で一般的な会話「おはよう」「いい天気ですね」や一般的な知識が必要となる質問。"
+                            "例2）related = 運営しているHPに関係のある質問でサイト独自の情報が必要となる質問。"
+                            "例3）other = 暴言などの不適切な質問。理解できない質問や言葉。"
+                        ),
                     },
                 },
                 "required": ["question", "kind"],

@@ -13,9 +13,6 @@
         integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
         crossorigin="anonymous"></script>
     <script src="//cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
-        integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
-        crossorigin="anonymous"></script>
     <link rel="icon" href="">
     <title>問診.com</title>
 </head>
@@ -36,10 +33,10 @@
                         <a class="nav-link {%if request.endpoint == 'main.index'%}active{%endif%}" aria-current="page"
                             href="{{url_for('main.index')}}">ホーム</a>
                     </li>
-                    <li class="nav-item">
+                    <!-- <li class="nav-item">
                         <a class="nav-link {%if request.endpoint == 'main.info'%}active{%endif%}"
-                            href="{{url_for('main.info')}}">会社情報</a>
-                    </li>
+                            href="{#{{url_for('main.info')}}#}">会社情報</a>
+                    </li> -->
                     <li class="nav-item">
                         <a class="nav-link {%if request.endpoint == 'main.inquiry'%}active{%endif%}"
                             href="{{url_for('main.inquiry')}}">お問い合わせ</a>

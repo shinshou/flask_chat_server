@@ -16,11 +16,11 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
 
 # IPアドレスごとのリクエスト制限
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    storage_uri="redis://localhost:6379",
-)
+# limiter = Limiter(
+#     app=app,
+#     key_func=get_remote_address,
+#     storage_uri="redis://localhost:6379",
+# )
 
 CORS(
     app,
@@ -47,10 +47,13 @@ CORS(
     supports_credentials=True,
 )
 
+# git push時は下記をコメントアウトする
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
     basedir, "data.sqlite"
 )
+
+# git push時は下記をコメントインする
 # app.config[
 #     "SQLALCHEMY_DATABASE_URI"
 # ] = os.environ.get("MYSQL_CONFIG")
@@ -74,6 +77,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import event
 
 
+# git push時は下記をコメントアウトする。
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
